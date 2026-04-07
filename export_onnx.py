@@ -25,7 +25,7 @@ def export(input_path: str, output_path: str):
         (dummy_context, dummy_missing),
         output_path,
         export_params=True,
-        opset_version=20,
+        opset_version=14,
         do_constant_folding=True,
         input_names=["recipe_context", "missing_ingredient"],
         output_names=["scores"],

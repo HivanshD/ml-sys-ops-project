@@ -3,7 +3,7 @@
     {
       "INPUT_JSON": {
         "content": ["{\"recipe_context\": [10, 23, 45, 67, 89, 12, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], \"missing_ingredient\": 45}"],
-        "shape": [1, 1]
+        "shape": [1]
       }
     }
   ]
