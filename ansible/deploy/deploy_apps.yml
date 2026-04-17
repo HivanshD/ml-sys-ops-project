@@ -1,0 +1,117 @@
+---
+- name: Deploy Mealie and substitution-serving
+  hosts: node1
+  become: true
+  vars:
+    kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+    remote_k8s_path: /tmp/serving-k8s
+    serving_image: substitution-serving:local
+    mealie_postgres_user: mealie
+    mealie_postgres_db: mealie
+    mealie_base_url: http://localhost:9000
+  tasks:
+    - name: Ensure remote k8s directory exists
+      ansible.builtin.file:
+        path: "{{ remote_k8s_path }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy k8s manifests to node1
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../k8s/"
+        dest: "{{ remote_k8s_path }}/"
+        mode: preserve
+
+    - name: Ensure app namespaces exist
+      ansible.builtin.command: kubectl apply -f {{ item }}
+      loop:
+        - "{{ remote_k8s_path }}/apps/mealie/namespace.yaml"
+        - "{{ remote_k8s_path }}/apps/substitution-serving/namespace.yaml"
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: true
+
+    - name: Check for existing Mealie secret
+      ansible.builtin.command: kubectl get secret mealie-credentials -n forkwise-app
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: mealie_secret_check
+      failed_when: false
+      changed_when: false
+
+    - name: Generate Mealie DB password
+      ansible.builtin.set_fact:
+        mealie_db_password: "{{ lookup('password', '/dev/null length=20 chars=ascii_letters,digits') }}"
+      when: mealie_secret_check.rc != 0
+
+    - name: Create Mealie credentials secret
+      ansible.builtin.command: >-
+        kubectl create secret generic mealie-credentials
+        --namespace forkwise-app
+        --from-literal=postgres-user={{ mealie_postgres_user }}
+        --from-literal=postgres-password={{ mealie_db_password }}
+        --from-literal=postgres-db={{ mealie_postgres_db }}
+        --from-literal=base-url={{ mealie_base_url }}
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      when: mealie_secret_check.rc != 0
+
+    - name: Apply substitution-serving manifests
+      ansible.builtin.command: kubectl apply -k {{ remote_k8s_path }}/apps/substitution-serving
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: serving_apply
+      changed_when: true
+
+    - name: Apply Mealie manifests
+      ansible.builtin.command: kubectl apply -k {{ remote_k8s_path }}/apps/mealie
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: mealie_apply
+      changed_when: true
+
+    - name: Set final serving image after apply
+      ansible.builtin.command: >-
+        kubectl set image deployment/substitution-serving
+        substitution-serving={{ serving_image }}
+        -n forkwise-serving
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: serving_image_set
+      changed_when: true
+
+    - name: Wait for substitution-serving rollout
+      ansible.builtin.command: kubectl rollout status deployment/substitution-serving -n forkwise-serving --timeout=180s
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+
+    - name: Wait for mealie-postgres rollout
+      ansible.builtin.command: kubectl rollout status deployment/mealie-postgres -n forkwise-app --timeout=180s
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+
+    - name: Wait for mealie rollout
+      ansible.builtin.command: kubectl rollout status deployment/mealie -n forkwise-app --timeout=240s
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      changed_when: false
+
+    - name: Show Mealie services
+      ansible.builtin.command: kubectl get svc -n forkwise-app
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: mealie_svc_status
+      changed_when: false
+
+    - name: Show serving services
+      ansible.builtin.command: kubectl get svc -n forkwise-serving
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: serving_svc_status
+      changed_when: false
+
+    - name: Print service status
+      ansible.builtin.debug:
+        msg: "{{ mealie_svc_status.stdout_lines + serving_svc_status.stdout_lines }}"

@@ -1,0 +1,16 @@
+---
+- name: Hello, world - verify Ansible connectivity
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Ping all hosts
+      ansible.builtin.ping:
+
+    - name: Print host identity
+      ansible.builtin.command: hostname
+      register: hostname_out
+      changed_when: false
+
+    - name: Show hostname output
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} -> {{ hostname_out.stdout }}"

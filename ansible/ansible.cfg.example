@@ -1,0 +1,10 @@
+[defaults]
+inventory = ./inventory.yml
+stdout_callback = default
+callback_result_format = yaml
+host_key_checking = False
+retry_files_enabled = False
+
+[ssh_connection]
+ssh_args = -o ProxyJump=cc@REPLACE_WITH_FLOATING_IP -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlMaster=auto -o ControlPersist=60s
+pipelining = True

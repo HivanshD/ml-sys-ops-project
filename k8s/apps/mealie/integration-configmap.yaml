@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: forkwise-integration
+  namespace: forkwise-app
+data:
+  SUBSTITUTION_API_URL: http://substitution-serving.forkwise-serving.svc.cluster.local:8000/predict

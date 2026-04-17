@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: substitution-serving
+  namespace: forkwise-serving
+spec:
+  selector:
+    app: substitution-serving
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30080
+  type: NodePort

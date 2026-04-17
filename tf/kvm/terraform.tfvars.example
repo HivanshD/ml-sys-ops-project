@@ -1,0 +1,15 @@
+suffix = "proj99"
+key    = "your-keypair-name"
+
+# Update these if your project/site uses different names.
+# The default topology gives every node a sharednet1 interface for outbound
+# package access, while only node1 receives the floating IP.
+# If sharednet1 is exhausted on KVM@TACC, switch the Terraform design to a
+# project-owned routed network with one floating IP on node1 instead of
+# forcing the sharednet1 assumption.
+image_name           = "CC-Ubuntu24.04"
+flavor_id            = ""
+flavor_name          = "m1.medium"
+sharednet_name       = "sharednet1"
+floating_ip_pool     = "public"
+security_group_names = ["default"]

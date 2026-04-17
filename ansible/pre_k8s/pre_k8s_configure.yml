@@ -1,0 +1,40 @@
+---
+- name: Prepare nodes for Kubernetes bootstrap
+  hosts: all
+  become: true
+  tasks:
+    - name: Install base packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - ca-certificates
+          - jq
+          - python3
+        update_cache: true
+
+    - name: Disable ufw if present
+      ansible.builtin.systemd:
+        name: ufw
+        state: stopped
+        enabled: false
+      failed_when: false
+
+    - name: Ensure br_netfilter module is loaded on boot
+      ansible.builtin.copy:
+        dest: /etc/modules-load.d/k8s.conf
+        mode: "0644"
+        content: |
+          br_netfilter
+
+    - name: Enable kernel params needed by Kubernetes networking
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/99-kubernetes-cri.conf
+        mode: "0644"
+        content: |
+          net.bridge.bridge-nf-call-iptables = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.ipv4.ip_forward = 1
+
+    - name: Apply sysctl settings
+      ansible.builtin.command: sysctl --system
+      changed_when: true
