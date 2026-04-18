@@ -1,0 +1,72 @@
+services:
+  substitution-serving:
+    build:
+      context: .
+      dockerfile: fastapi_onnx/Dockerfile
+    container_name: serving-substitution
+    ports:
+      - "8000:8000"
+    environment:
+      ONNX_MODEL_PATH: subst_model.onnx
+    restart: unless-stopped
+
+  mealie-postgres:
+    image: postgres:17
+    container_name: serving-mealie-postgres
+    environment:
+      POSTGRES_USER: mealie
+      POSTGRES_PASSWORD: mealiepass
+      POSTGRES_DB: mealie
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - mealie-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mealie -d mealie"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:v3.10.1
+    container_name: serving-mealie
+    depends_on:
+      mealie-postgres:
+        condition: service_healthy
+    ports:
+      - "9000:9000"
+    environment:
+      ALLOW_SIGNUP: "false"
+      PUID: "1000"
+      PGID: "1000"
+      TZ: UTC
+      BASE_URL: http://localhost:9000
+      DB_ENGINE: postgres
+      POSTGRES_USER: mealie
+      POSTGRES_PASSWORD: mealiepass
+      POSTGRES_SERVER: mealie-postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: mealie
+    volumes:
+      - mealie-app-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000')"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+    restart: unless-stopped
+
+  jupyter:
+    image: jupyter/base-notebook:latest
+    container_name: serving-jupyter
+    working_dir: /home/jovyan/work
+    command: start-notebook.sh --ServerApp.token='' --ServerApp.password='' --ServerApp.root_dir=/home/jovyan/work
+    ports:
+      - "8899:8888"
+    volumes:
+      - .:/home/jovyan/work
+    restart: unless-stopped
+
+volumes:
+  mealie-postgres-data:
+  mealie-app-data:

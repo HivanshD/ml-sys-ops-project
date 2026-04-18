@@ -1,0 +1,58 @@
+---
+- name: Install k3s server on node1
+  hosts: node1
+  become: true
+  tasks:
+    - name: Install k3s server
+      ansible.builtin.shell: |
+        curl -sfL https://get.k3s.io | \
+          INSTALL_K3S_EXEC="server --write-kubeconfig-mode 644 --node-ip {{ ansible_host }} --advertise-address {{ ansible_host }} --tls-san {{ ansible_host }}" \
+          sh -
+      args:
+        executable: /bin/bash
+        creates: /etc/systemd/system/k3s.service
+
+    - name: Read k3s node token
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/k3s/server/node-token
+      register: node_token_raw
+
+    - name: Store k3s node token for worker plays
+      ansible.builtin.set_fact:
+        k3s_node_token: "{{ node_token_raw.content | b64decode | trim }}"
+
+- name: Install k3s agents on workers
+  hosts: node2:node3
+  become: true
+  vars:
+    k3s_url: "https://{{ hostvars['node1'].ansible_host }}:6443"
+    k3s_token: "{{ hostvars['node1'].k3s_node_token }}"
+  tasks:
+    - name: Install k3s agent
+      ansible.builtin.shell: |
+        curl -sfL https://get.k3s.io | \
+          K3S_URL="{{ k3s_url }}" \
+          K3S_TOKEN="{{ k3s_token }}" \
+          INSTALL_K3S_EXEC="agent --node-ip {{ ansible_host }}" \
+          sh -
+      args:
+        executable: /bin/bash
+        creates: /etc/systemd/system/k3s-agent.service
+
+- name: Verify cluster node registration from node1
+  hosts: node1
+  become: true
+  tasks:
+    - name: Wait for nodes to become visible
+      ansible.builtin.command: kubectl get nodes --no-headers
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+      register: node_list
+      retries: 20
+      delay: 10
+      until: node_list.stdout_lines | length >= 3
+      changed_when: false
+
+    - name: Show cluster nodes
+      ansible.builtin.debug:
+        msg: "{{ node_list.stdout_lines }}"

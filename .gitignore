@@ -1,0 +1,25 @@
+# Terraform and OpenStack auth
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Local infra config and secrets
+clouds.yaml
+terraform.tfvars
+terraform.tfvars.json
+ansible.cfg
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.pyc
+
+# MacOS
+.DS_Store

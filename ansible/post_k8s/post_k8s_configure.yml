@@ -1,0 +1,62 @@
+---
+- name: Post-install kubectl and Helm setup
+  hosts: node1
+  become: true
+  vars:
+    ansible_user_name: cc
+  tasks:
+    - name: Ensure kube config directory exists
+      ansible.builtin.file:
+        path: "/home/{{ ansible_user_name }}/.kube"
+        state: directory
+        owner: "{{ ansible_user_name }}"
+        group: "{{ ansible_user_name }}"
+        mode: "0755"
+
+    - name: Copy k3s kubeconfig to user home
+      ansible.builtin.copy:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: "/home/{{ ansible_user_name }}/.kube/config"
+        remote_src: true
+        owner: "{{ ansible_user_name }}"
+        group: "{{ ansible_user_name }}"
+        mode: "0600"
+
+    - name: Rewrite kubeconfig localhost server to node1 private IP
+      ansible.builtin.replace:
+        path: "/home/{{ ansible_user_name }}/.kube/config"
+        regexp: 'https://127\\.0\\.0\\.1:6443'
+        replace: "https://{{ ansible_host }}:6443"
+
+    - name: Install Helm
+      ansible.builtin.shell: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        executable: /bin/bash
+        creates: /usr/local/bin/helm
+
+    - name: Install metrics-server for kubectl top
+      ansible.builtin.command: kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+      register: metrics_apply
+      changed_when: "'created' in metrics_apply.stdout or 'configured' in metrics_apply.stdout or 'unchanged' not in metrics_apply.stdout"
+
+    - name: Patch metrics-server to tolerate insecure kubelet TLS on k3s
+      ansible.builtin.command: >-
+        kubectl patch deployment metrics-server -n kube-system --type=json
+        -p=[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+      failed_when: false
+      changed_when: false
+
+    - name: Verify kubectl nodes
+      ansible.builtin.command: kubectl get nodes
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+      register: node_status
+      changed_when: false
+
+    - name: Show node status
+      ansible.builtin.debug:
+        msg: "{{ node_status.stdout_lines }}"
