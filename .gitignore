@@ -1,25 +1,52 @@
-# Terraform and OpenStack auth
+# Model weights — live in object storage, never in git
+*.pth
+*.onnx
+*.safetensors
+*.bin
+
+# Vocabulary artifacts — live in object storage
+**/vocab.json
+
+# Secrets — NEVER commit
+.env
+.env.*
+*.secret
+secrets/
+**/secrets/
+
+# Terraform state (contains secrets, machine-generated)
 *.tfstate
 *.tfstate.*
 .terraform/
 .terraform.lock.hcl
-crash.log
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
 
-# Local infra config and secrets
-clouds.yaml
-terraform.tfvars
-terraform.tfvars.json
-ansible.cfg
-*.pem
-*.key
+# Ansible vault / SSH keys
+*.vault
+id_rsa*
+!id_rsa*.pub
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+env/
 
-# MacOS
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / editor
 .DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Benchmark / perf outputs
+benchmark_results_*.json
+perf_analyzer_*.csv
+
+# Docker build artifacts
+*.tar

@@ -1,89 +1,47 @@
-# Serving Repository
+# ml-sys-ops-project
 
-This repository is the source of truth for the integrated FrokWise deployment.
+**ECE-GY 9183 | proj01 | Ingredient Substitution for Mealie**
 
-It started as a small serving-focused repo for model-serving experiments: FastAPI, ONNX, Triton, and benchmarking. After the infra migration, it now owns both the serving implementation and the deployment shape needed to run the integrated system.
+End-to-end ML system that adds AI-powered ingredient substitution
+suggestions to Mealie, a self-hosted recipe manager. When a user is missing an ingredient, the
+system suggests ranked substitutions via an embedding-based model trained
+on Recipe1MSubs.
 
-## What Changed
+## Components
 
-This repo is no longer only a place for serving experiments.
+| Directory | Owner | Purpose |
+|-----------|-------|---------|
+| serving/ | Serving | FastAPI + ONNX inference, monitoring, rollback/promote |
+| training/ | Training | Train pipeline, MLflow integration, quality gates |
+| data/ | Data | Recipe1MSubs ingestion, feedback capture, drift monitoring |
+| infra/ | DevOps | K8S manifests, Ansible, Terraform, automation |
+| mealie-integration/ | Team | Mealie backend patch + Vue component |
+| archive/ | - | Initial implementation files, preserved for reference |
 
-It now also owns:
+## Where to start
 
-1. infrastructure layout for Chameleon under `tf/`
-2. configuration and deployment orchestration under `ansible/`
-3. Kubernetes application manifests under `k8s/`
-4. migration and operating documentation under `docs/` and `RUNBOOK.md`
+- New team member: read serving/TEAM_INTEGRATION_MAP.md
+- Integration contract: serving/INTEGRATION.md
+- Operational runbook: serving/RUNBOOK.md
+- Lab references: serving/LAB_REFERENCES.md
+- Infra migration notes: infra/docs/
 
-The intent is to make this repository the canonical place another engineer or agent lands when they need to understand how the integrated Mealie plus substitution-serving system is supposed to run.
+## One-command setup (on Chameleon)
 
-## Current Architectural Direction
+```bash
+# Provision infrastructure
+cd infra/tf/kvm && terraform apply
+cd ../../ansible && ansible-playbook setup.yml
 
-The current deployment decisions are:
-
-1. canonical repo boundary: this `serving/` Git repo
-2. primary serving stack: `FastAPI + ONNX`
-3. secondary serving path: `Triton`, kept as an experiment and benchmark path
-4. primary app target: `Mealie`
-5. environment strategy: local Kubernetes for fast iteration, Chameleon as the documented target environment
-6. rollout model: a single app deployment path for now, not `staging/canary/production`
-7. infra depth for this migration phase: `Terraform + Ansible + Kubernetes manifests + runbook`
-
-## Repository Layout
-
-```text
-.
-├── ansible/
-├── docs/
-├── fastapi_onnx/
-├── fastapi_pt/
-├── k8s/
-├── tf/
-├── triton_client/
-├── triton_models/
-├── RUNBOOK.md
-├── benchmark.py
-├── docker-compose-fastapi.yaml
-├── docker-compose-triton.yaml
-├── Dockerfile.triton
-├── Dockerfile.triton_client
-├── export_onnx.py
-├── model_stub.py
-└── quantize_onnx.py
+# Apply K8S manifests
+kubectl apply -f infra/k8s/namespaces.yaml
+kubectl apply -f infra/k8s/ --recursive
+kubectl apply -f serving/k8s-cronjob-manifests.yaml
 ```
 
-## Where To Start
+## Chameleon resource naming
 
-1. Read `docs/adr/0001-repo-migration-and-deployment-boundary.md` for the canonical repo-boundary decision.
-2. Read `docs/MIGRATION_MAP.md` for the old-to-new path mapping.
-3. Read `RUNBOOK.md` for the intended bring-up flow.
-4. Use `fastapi_onnx/` as the default serving implementation path.
+All resources use the suffix `proj01`:
+- **Namespaces:** `production-proj01`, `canary-proj01`, `staging-proj01`, `monitoring-proj01`
+- **Buckets:** `data-proj01`, `models-proj01`, `logs-proj01`
 
-## Current Status
-
-The repo-boundary migration is no longer only conceptual.
-
-This repo now contains:
-
-1. real Terraform files under `tf/kvm/`
-2. real Ansible bootstrap and deploy playbooks under `ansible/`
-3. raw Kubernetes manifests for `Mealie` and `substitution-serving` under `k8s/apps/`
-4. canonical migration docs under `docs/`
-
-The existing serving implementation remains in place:
-
-1. `fastapi_onnx/` is the primary deployment path.
-2. `fastapi_pt/` remains available for comparison.
-3. `Dockerfile.triton`, `triton_models/`, and `docker-compose-triton.yaml` remain the Triton evaluation path.
-
-## Minimal Chameleon Bring-Up
-
-The current intended deployment path is:
-
-1. provision infrastructure from `tf/kvm/`
-2. prepare the nodes with `ansible/pre_k8s/pre_k8s_configure.yml`
-3. bootstrap k3s with `ansible/k8s/install_k3s.yml`
-4. run `ansible/post_k8s/post_k8s_configure.yml`
-5. deploy the apps with `ansible/deploy/deploy_apps.yml`
-
-For the exact command sequence, read `RUNBOOK.md`.
