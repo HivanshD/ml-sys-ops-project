@@ -112,13 +112,13 @@ Serving provides the container image tags they reference:
 
 | Image tag | Built from | Deployed to |
 |-----------|-----------|-------------|
-| `subst-serving-onnx:v{git_sha}` | `Dockerfile.fastapi_onnx` | `staging-proj01`, `canary-proj01`, `production-proj01` |
+| `subst-serving-onnx:v{git_sha}` | `Dockerfile.fastapi_onnx` | `forkwise-serving` |
 | `subst-serving-pt:v{git_sha}` | `Dockerfile.fastapi_pt` | (optional baseline) |
 | `subst-triton:v{git_sha}` | `Dockerfile.triton` | (benchmarking only) |
 
-Serving also contributes these CronJob scripts (DevOps writes the manifests):
-- `scripts/check_rollback.py` → CronJob every 5 min in `production-proj01`
-- `scripts/check_promote.py` → CronJob every 5 min in `canary-proj01`
+The current canonical deploy path is the app-oriented layout under
+`infra/k8s/apps/substitution-serving/`, not the older multi-environment
+`staging/canary/production` layout.
 
 ---
 

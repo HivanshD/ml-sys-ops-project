@@ -21,7 +21,7 @@ ansible/
 2. `pre_k8s/pre_k8s_configure.yml` prepares the nodes for Kubernetes.
 3. `k8s/install_k3s.yml` installs k3s with `node1` as the server and `node2`/`node3` as agents.
 4. `post_k8s/post_k8s_configure.yml` prepares kubectl access and installs Helm and metrics-server.
-5. `deploy/deploy_apps.yml` copies this repo's `k8s/` directory to `node1`, creates the required Mealie secret, and applies the app manifests.
+5. `deploy/deploy_apps.yml` copies this repo's `k8s/` directory to `node1`, creates the required Mealie secret, and applies the base app manifests for Mealie and substitution-serving.
 
 ## Minimal Sequence
 
@@ -35,6 +35,10 @@ ansible-playbook -i inventory.yml k8s/install_k3s.yml
 ansible-playbook -i inventory.yml post_k8s/post_k8s_configure.yml
 ansible-playbook -i inventory.yml deploy/deploy_apps.yml -e serving_image=<registry>/substitution-serving:<tag>
 ```
+
+For the full ForkWise cloud bring-up, continue with
+`infra/docs/FORKWISE_CLOUD_SETUP.md` after this base deploy. That runbook covers
+the GHCR-backed `forkwise-data` workloads and the one-time ingest bootstrap job.
 
 ## Notes
 

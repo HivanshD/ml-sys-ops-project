@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: drift-monitor
+  namespace: forkwise-data
+spec:
+  schedule: "0 */6 * * *"
+  suspend: true
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: drift
+              image: ghcr.io/itsnotaka/forkwise-batch:demo
+              imagePullPolicy: Always
+              command: ["python", "drift_monitor.py"]
+              envFrom:
+                - configMapRef:
+                    name: forkwise-data-config
+              env:
+                - name: OS_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-credentials
+                      key: access-key
+                - name: OS_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: s3-credentials
+                      key: secret-key
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi

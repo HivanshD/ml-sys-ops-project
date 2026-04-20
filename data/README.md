@@ -7,11 +7,13 @@ Covers all three rubric-required quality checkpoints plus supporting services.
 
 ## Rubric mapping
 
-| Rubric requirement | File | Quality checkpoint |
-|---|---|---|
-| Evaluate data quality at ingestion from external sources | `ingest.py` | QC1 |
-| Evaluate data quality when compiling training sets | `batch_pipeline.py` | QC2 |
-| Monitor live inference data quality and drift | `drift_monitor.py` | QC3 |
+
+| Rubric requirement                                       | File                | Quality checkpoint |
+| -------------------------------------------------------- | ------------------- | ------------------ |
+| Evaluate data quality at ingestion from external sources | `ingest.py`         | QC1                |
+| Evaluate data quality when compiling training sets       | `batch_pipeline.py` | QC2                |
+| Monitor live inference data quality and drift            | `drift_monitor.py`  | QC3                |
+
 
 ## Bucket layout
 
@@ -45,14 +47,32 @@ data-proj01/
 
 ## Files
 
-| File | Purpose | Runs as |
-|---|---|---|
-| `ingest.py` | QC1: validate + upload Recipe1MSubs, create bucket/folders | K8s Job (one-shot) |
-| `batch_pipeline.py` | QC2: compile versioned training data from feedback | K8s CronJob (daily) |
-| `drift_monitor.py` | QC3: OOV rate + confidence + volume checks | K8s CronJob (every 6h) |
-| `feedback_endpoint.py` | FastAPI service capturing user accept/reject | K8s Deployment + Service |
-| `online_features.py` | Converts Mealie recipe → serving input schema | Imported by Mealie backend |
-| `data_generator.py` | Replays holdout records against serving endpoint | K8s Deployment |
+
+| File                   | Purpose                                                    | Runs as                    |
+| ---------------------- | ---------------------------------------------------------- | -------------------------- |
+| `ingest.py`            | QC1: validate + upload Recipe1MSubs, create bucket/folders | K8s Job (one-shot)         |
+| `batch_pipeline.py`    | QC2: compile versioned training data from feedback         | K8s CronJob (daily)        |
+| `drift_monitor.py`     | QC3: OOV rate + confidence + volume checks                 | K8s CronJob (every 6h)     |
+| `feedback_endpoint.py` | FastAPI service capturing user accept/reject               | K8s Deployment + Service   |
+| `online_features.py`   | Converts Mealie recipe → serving input schema              | Imported by Mealie backend |
+| `data_generator.py`    | Replays holdout records against serving endpoint           | K8s Deployment             |
+
+
+## Canonical deployment assets
+
+The canonical cloud deployment path now lives in:
+
+- `infra/k8s/apps/forkwise-data/`
+- `infra/docs/FORKWISE_CLOUD_SETUP.md`
+
+The published GHCR images used by those manifests are:
+
+```text
+ghcr.io/itsnotaka/forkwise-ingest:demo
+ghcr.io/itsnotaka/forkwise-feedback:demo
+ghcr.io/itsnotaka/forkwise-batch:demo
+ghcr.io/itsnotaka/forkwise-generator:demo
+```
 
 ## Environment variables (all scripts)
 
@@ -67,7 +87,7 @@ Script-specific:
 
 ```
 # data_generator.py
-SERVING_URL=http://subst-serving.production-proj01:8000/predict
+SERVING_URL=http://substitution-serving.forkwise-serving.svc.cluster.local:8000/predict
 REQUESTS_PER_SEC=1
 
 # batch_pipeline.py
@@ -98,12 +118,14 @@ METRICS_PORT=8002
 ### Training team must change
 
 `watch_trigger.py` line 10:
+
 ```python
 # OLD:  Prefix='triggers/'
 # NEW:  Prefix='data/triggers/'
 ```
 
 `train.py` model upload:
+
 ```python
 # OLD:  Bucket='models-proj01'
 # NEW:  Bucket='data-proj01', Key=f'models/{key}'
@@ -112,6 +134,7 @@ METRICS_PORT=8002
 ### Serving team must change
 
 `serve_pytorch.py` / `serve_onnx.py`:
+
 ```python
 # OLD:  REQUEST_LOG_BUCKET default "logs-proj01"
 # NEW:  REQUEST_LOG_BUCKET default "data-proj01"
@@ -121,8 +144,9 @@ METRICS_PORT=8002
 ```
 
 Serving must also call feedback endpoint from Mealie frontend:
+
 ```
-POST http://subst-feedback:8001/feedback
+POST http://subst-feedback.forkwise-data.svc.cluster.local:8001/feedback
 ```
 
 ## Docker builds
@@ -134,15 +158,28 @@ docker build -f Dockerfile.batch    -t forkwise-batch .
 docker build -f Dockerfile.generator -t forkwise-generator .
 ```
 
+## Docker pull and run
+
+Teammates can pull the canonical remote images directly:
+
+```bash
+docker pull ghcr.io/itsnotaka/forkwise-feedback:demo
+docker pull ghcr.io/itsnotaka/forkwise-batch:demo
+docker pull ghcr.io/itsnotaka/forkwise-generator:demo
+docker pull ghcr.io/itsnotaka/forkwise-ingest:demo
+```
+
+If the packages are private, run `docker login ghcr.io` first.
+
 ## Testing locally
 
 ```bash
-export OS_ENDPOINT=http://<MINIO_IP>:9000
+export OS_ENDPOINT=https://chi.tacc.chameleoncloud.org:7480
 export OS_ACCESS_KEY=<key>
 export OS_SECRET_KEY=<secret>
 
 # Test 1: Ingest (creates bucket + QC1)
-python ingest.py --data-dir ./recipe1msubs
+python ingest.py
 
 # Test 2: Feedback endpoint
 uvicorn feedback_endpoint:app --port 8001
@@ -159,3 +196,4 @@ MIN_REQUESTS_EXPECTED=1 python drift_monitor.py
 # Test 5: Data generator — needs serving endpoint up
 SERVING_URL=http://localhost:8000/predict python data_generator.py
 ```
+

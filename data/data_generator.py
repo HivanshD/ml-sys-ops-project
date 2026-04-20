@@ -16,8 +16,10 @@ def get_s3():
         aws_secret_access_key=os.getenv('OS_SECRET_KEY'))
 
 BUCKET = os.getenv('BUCKET', 'data-proj01')
-SERVING_URL = os.getenv('SERVING_URL',
-    'http://subst-serving.production-proj01:8000/predict')
+SERVING_URL = os.getenv(
+    'SERVING_URL',
+    'http://substitution-serving.forkwise-serving.svc.cluster.local:8000/predict',
+)
 RATE = float(os.getenv('REQUESTS_PER_SEC', '1'))
 
 

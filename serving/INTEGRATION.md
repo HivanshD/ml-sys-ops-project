@@ -3,6 +3,11 @@
 This document is the single source of truth for how the serving component
 integrates with Training, Data, DevOps, and the Mealie frontend.
 
+For the current cloud bring-up and canonical namespace layout, prefer
+`infra/docs/FORKWISE_CLOUD_SETUP.md` plus the manifests under `infra/k8s/apps/`.
+This document still contains older multi-environment contract details from the
+course handoff.
+
 If anything in this document is unclear or changes, ping me (serving role,
 Hivansh) before making assumptions.
 

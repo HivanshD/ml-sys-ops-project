@@ -7,6 +7,7 @@ This directory is the canonical home for Kubernetes application manifests.
 ```text
 k8s/
 ├── apps/
+│   ├── forkwise-data/
 │   ├── mealie/
 │   └── substitution-serving/
 └── platform/
@@ -23,3 +24,5 @@ The current first-pass deployment choices are:
 1. app workloads are pinned to `node1` for simpler persistent-volume behavior
 2. browser-facing access uses NodePorts on `node1`
 3. the recommended user path is SSH tunneling through the single floating IP
+4. data-plane workloads live in `apps/forkwise-data/` and pull their canonical
+   images from GHCR

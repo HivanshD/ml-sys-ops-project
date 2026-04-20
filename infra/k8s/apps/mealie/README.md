@@ -18,7 +18,7 @@ This directory now contains a first raw-manifest pass for:
 2. the Postgres dependency used by Mealie
 3. persistent volume claims for app and database data
 4. a NodePort service for Mealie on `30090`
-5. an integration `ConfigMap` declaring the in-cluster substitution-serving URL
+5. an integration `ConfigMap` declaring the in-cluster substitution-serving and feedback URLs
 6. stateful workloads pinned to `node1` for simpler local-path storage behavior
 
 Apply with:
@@ -43,13 +43,15 @@ kubectl -n forkwise-app create secret generic mealie-credentials \
 
 Do not commit live credentials to Git.
 
-## Future Integration Target
+## Future Integration Targets
 
-The intended in-cluster serving endpoint for future Mealie-side integration is:
+The intended in-cluster service contracts for Mealie-side integration are:
 
-`http://substitution-serving.forkwise-serving.svc.cluster.local:8000/predict`
+1. `http://substitution-serving.forkwise-serving.svc.cluster.local:8000/predict`
+2. `http://subst-feedback.forkwise-data.svc.cluster.local:8001/feedback`
 
-This repo does not yet implement the application-side hook, but this is the service contract location that future work should target.
+This repo does not yet implement the application-side hook, but these are the
+service contract locations that future work should target.
 
 ## Expected Responsibility
 
@@ -58,4 +60,4 @@ Assets added here should define:
 1. the Mealie app deployment
 2. any required database deployment or dependency wiring
 3. the service exposure used by the integrated system
-4. future configuration needed for Mealie to call the substitution-serving API
+4. future configuration needed for Mealie to call the serving and feedback APIs

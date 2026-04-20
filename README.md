@@ -21,27 +21,28 @@ on Recipe1MSubs.
 ## Where to start
 
 - New team member: read serving/TEAM_INTEGRATION_MAP.md
-- Integration contract: serving/INTEGRATION.md
-- Operational runbook: serving/RUNBOOK.md
-- Lab references: serving/LAB_REFERENCES.md
-- Infra migration notes: infra/docs/
+- Cloud deployment: `infra/docs/FORKWISE_CLOUD_SETUP.md`
+- Serving runbook: `serving/RUNBOOK.md`
+- Infra migration notes: `infra/docs/`
+- Historical serving integration notes: `serving/INTEGRATION.md`
 
-## One-command setup (on Chameleon)
+## Canonical cloud path
 
-```bash
-# Provision infrastructure
-cd infra/tf/kvm && terraform apply
-cd ../../ansible && ansible-playbook setup.yml
+The current canonical deployment uses app-oriented namespaces and GHCR-backed
+ForkWise data images:
 
-# Apply K8S manifests
-kubectl apply -f infra/k8s/namespaces.yaml
-kubectl apply -f infra/k8s/ --recursive
-kubectl apply -f serving/k8s-cronjob-manifests.yaml
+- `forkwise-app` for Mealie
+- `forkwise-serving` for the primary serving API
+- `forkwise-data` for feedback, ingest, generator, batch, and drift workloads
+
+Use `infra/docs/FORKWISE_CLOUD_SETUP.md` for the step-by-step cloud bring-up.
+
+## Published ForkWise data images
+
+```text
+ghcr.io/itsnotaka/forkwise-ingest:demo
+ghcr.io/itsnotaka/forkwise-feedback:demo
+ghcr.io/itsnotaka/forkwise-batch:demo
+ghcr.io/itsnotaka/forkwise-generator:demo
 ```
-
-## Chameleon resource naming
-
-All resources use the suffix `proj01`:
-- **Namespaces:** `production-proj01`, `canary-proj01`, `staging-proj01`, `monitoring-proj01`
-- **Buckets:** `data-proj01`, `models-proj01`, `logs-proj01`
 

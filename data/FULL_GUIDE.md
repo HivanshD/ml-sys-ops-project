@@ -1,5 +1,13 @@
 # FULL GUIDE — Data Team, Start to Finish
 
+> Historical walkthrough for the original course handoff.
+>
+> The canonical cloud deployment path for the current repo is now:
+> `infra/docs/FORKWISE_CLOUD_SETUP.md`
+>
+> The canonical Kubernetes manifests are now under:
+> `infra/k8s/apps/forkwise-data/`
+
 ---
 
 ## Your files (what you push to Git)
@@ -30,7 +38,7 @@ data/
 
 ### A1. Generate EC2 credentials
 
-📍 **WHERE:** Chameleon Jupyter notebook (https://jupyter.chameleoncloud.org)
+📍 **WHERE:** Chameleon Jupyter notebook ([https://jupyter.chameleoncloud.org](https://jupyter.chameleoncloud.org))
 
 Open a new notebook. Run this single cell:
 
@@ -114,6 +122,7 @@ python data/ingest.py
 ```
 
 **Expected output:**
+
 ```
 [setup] Bucket data-proj01 ready
 STEP 1: Downloading data sources
@@ -134,11 +143,12 @@ STEP 5: Recipe context from layer1.json
 
 ### B2. Verify in Chameleon Horizon
 
-📍 **WHERE:** Browser — https://chi.tacc.chameleoncloud.org
+📍 **WHERE:** Browser — [https://chi.tacc.chameleoncloud.org](https://chi.tacc.chameleoncloud.org)
 
 Go to **Project → Object Store → Containers → data-proj01**
 
 You should see:
+
 ```
 data/raw/recipe1msubs/train.json     ✓
 data/raw/recipe1msubs/val.json       ✓
@@ -269,11 +279,13 @@ spec:
 ```
 
 Apply:
+
 ```bash
 kubectl apply -f data/k8s/feedback.yaml
 ```
 
 Verify:
+
 ```bash
 kubectl get pods -n production-proj01 -l app=subst-feedback
 # Should show: Running
@@ -333,11 +345,13 @@ spec:
 ```
 
 Apply:
+
 ```bash
 kubectl apply -f data/k8s/generator.yaml
 ```
 
 Verify:
+
 ```bash
 kubectl logs -f deployment/data-generator -n production-proj01
 # Should print: [1] sour cream -> greek yogurt | 1.0 req/s
@@ -390,11 +404,13 @@ spec:
 ```
 
 Apply:
+
 ```bash
 kubectl apply -f data/k8s/batch-cronjob.yaml
 ```
 
 Test manually (don't wait until 2am):
+
 ```bash
 kubectl create job batch-test --from=cronjob/batch-pipeline -n production-proj01
 kubectl logs job/batch-test -n production-proj01 -f
@@ -447,11 +463,13 @@ spec:
 ```
 
 Apply:
+
 ```bash
 kubectl apply -f data/k8s/drift-cronjob.yaml
 ```
 
 Test manually:
+
 ```bash
 kubectl create job drift-test --from=cronjob/drift-monitor -n production-proj01
 kubectl logs job/drift-test -n production-proj01 -f
@@ -472,11 +490,13 @@ Send this message:
 > Your changes needed:
 >
 > `watch_trigger.py` line 10:
+>
 > ```python
 > result = s3.list_objects_v2(Bucket='data-proj01', Prefix='data/triggers/')
 > ```
 >
 > `train.py` model upload — change bucket:
+>
 > ```python
 > s3.put_object(Bucket='data-proj01', Key=f'models/{key}', Body=f)
 > ```
@@ -494,17 +514,20 @@ Send this message:
 > **Two changes needed in serve_pytorch.py / serve_onnx.py:**
 >
 > 1. Change default bucket:
+>
 > ```python
 > REQUEST_LOG_BUCKET = os.getenv("REQUEST_LOG_BUCKET", "data-proj01")
 > ```
 >
-> 2. Change request log key prefix:
+> 1. Change request log key prefix:
+>
 > ```python
 > key = f"logs/requests/request_{int(time.time())}_{request_id}.json"
 > ```
 >
 > Also: Mealie frontend needs to call my feedback endpoint when user
 > clicks accept/reject:
+>
 > ```
 > POST http://subst-feedback:8001/feedback
 > Body: {"request_id":"...", "recipe_id":"...", "missing_ingredient":"...",
@@ -518,12 +541,14 @@ Send this message:
 Send this message:
 
 > **I need:**
+>
 > 1. Container registry URL to push my images
 > 2. K8s namespace name (I'm assuming `production-proj01`)
 > 3. kubectl access configured
 > 4. Confirm: can I create secrets in the namespace?
 >
 > **I will deploy:**
+>
 > - 1 Deployment + Service (feedback endpoint, port 8001)
 > - 1 Deployment (data generator)
 > - 2 CronJobs (batch pipeline daily, drift monitor every 6h)
@@ -537,6 +562,7 @@ Send this message:
 📍 **WHERE:** Your laptop terminal
 
 ### F1. Check all pods are running
+
 ```bash
 kubectl get pods -n production-proj01
 # Should see: subst-feedback Running, data-generator Running
@@ -545,15 +571,18 @@ kubectl get cronjobs -n production-proj01
 ```
 
 ### F2. Check data generator is producing traffic
+
 ```bash
 kubectl logs deployment/data-generator -n production-proj01 --tail=5
 ```
 
 ### F3. Check serving is logging requests
+
 📍 **WHERE:** Browser — Chameleon Horizon → Object Store → data-proj01
 Look in `logs/requests/` — should see `request_*.json` files appearing.
 
 ### F4. Send test feedback and verify batch pipeline
+
 ```bash
 # Send 3 test feedback entries
 for i in 1 2 3; do
@@ -574,6 +603,7 @@ kubectl logs job/batch-verify -n production-proj01 -f
 ```
 
 ### F5. Trigger drift monitor manually
+
 ```bash
 kubectl create job drift-verify --from=cronjob/drift-monitor -n production-proj01
 kubectl logs job/drift-verify -n production-proj01 -f
@@ -586,8 +616,10 @@ kubectl logs job/drift-verify -n production-proj01 -f
 ```
 
 ### F6. Check quality reports in bucket
+
 📍 **WHERE:** Browser — Chameleon Horizon → Object Store → data-proj01
 Look in `data/quality_reports/` — should see:
+
 ```
 ingest_<ts>.json    ← from step B1
 batch_<ts>.json     ← from step F4
@@ -606,38 +638,41 @@ Show these in order:
 
 1. **Terminal:** `kubectl logs deployment/data-generator` — show traffic flowing
 2. **Horizon:** Open `logs/requests/` — show files appearing, open one, show
-   it has ingredients but NO user identity → **"privacy safeguard"**
+  it has ingredients but NO user identity → **"privacy safeguard"**
 3. **Terminal:** Trigger batch pipeline, show QC2 output:
-   ```
+  ```
    [QC2] Valid: X, Schema: 0, Dedup: 0, Leakage: 0
    [QC2] PASSED
-   ```
+  ```
 4. **Horizon:** Show `data/triggers/retrain_*.json` appeared → explain
-   "training's watch_trigger.py picks this up automatically"
+  "training's watch_trigger.py picks this up automatically"
 5. **Terminal:** Trigger drift monitor, show QC3 output:
-   ```
+  ```
    [drift] OOV PASSED (2.3%)
    [drift] Confidence PASSED (avg=0.847)
    [drift] ALL CLEAR
-   ```
+  ```
 6. **Horizon:** Show `data/quality_reports/` with all 3 report types →
-   "I evaluate data quality at all three required checkpoints"
+  "I evaluate data quality at all three required checkpoints"
 
 ---
 
 ## Quick reference: what runs where
 
-| Action | Where | When |
-|---|---|---|
-| Generate EC2 credentials | Chameleon Jupyter notebook | Once |
-| Run `ingest.py` | Your laptop terminal | Once |
-| Verify bucket contents | Browser (Chameleon Horizon) | After ingest |
-| `docker build` + `docker push` | Your laptop terminal | Once (or when code changes) |
-| `kubectl apply` manifests | Your laptop terminal | Once |
-| `kubectl create job --from=cronjob` | Your laptop terminal | To test CronJobs |
-| `kubectl logs` | Your laptop terminal | To verify |
-| batch_pipeline.py | K8s CronJob (automatic) | Daily 2am |
-| drift_monitor.py | K8s CronJob (automatic) | Every 6h |
-| feedback_endpoint.py | K8s Deployment (automatic) | Always running |
-| data_generator.py | K8s Deployment (automatic) | Always running |
-| Demo video | Screen recording | Once, at end |
+
+| Action                              | Where                       | When                        |
+| ----------------------------------- | --------------------------- | --------------------------- |
+| Generate EC2 credentials            | Chameleon Jupyter notebook  | Once                        |
+| Run `ingest.py`                     | Your laptop terminal        | Once                        |
+| Verify bucket contents              | Browser (Chameleon Horizon) | After ingest                |
+| `docker build` + `docker push`      | Your laptop terminal        | Once (or when code changes) |
+| `kubectl apply` manifests           | Your laptop terminal        | Once                        |
+| `kubectl create job --from=cronjob` | Your laptop terminal        | To test CronJobs            |
+| `kubectl logs`                      | Your laptop terminal        | To verify                   |
+| batch_pipeline.py                   | K8s CronJob (automatic)     | Daily 2am                   |
+| drift_monitor.py                    | K8s CronJob (automatic)     | Every 6h                    |
+| feedback_endpoint.py                | K8s Deployment (automatic)  | Always running              |
+| data_generator.py                   | K8s Deployment (automatic)  | Always running              |
+| Demo video                          | Screen recording            | Once, at end                |
+
+
