@@ -67,6 +67,8 @@ FLAVORGRAPH_URLS = {
 # ── Vocab stub (same as notebook 4 — needed to unpickle) ──────
 _inv = types.ModuleType("inv_cooking")
 _inv.config = types.ModuleType("inv_cooking.config")
+_inv.datasets = types.ModuleType("inv_cooking.datasets")
+_inv.datasets.vocabulary = types.ModuleType("inv_cooking.datasets.vocabulary")
 class _Vocab:
     def __init__(self):
         self.word2idx = {}
@@ -74,8 +76,11 @@ class _Vocab:
     def __len__(self):
         return len(self.word2idx)
 _inv.config.Vocabulary = _Vocab
+_inv.datasets.vocabulary.Vocabulary = _Vocab
 sys.modules["inv_cooking"] = _inv
 sys.modules["inv_cooking.config"] = _inv.config
+sys.modules["inv_cooking.datasets"] = _inv.datasets
+sys.modules["inv_cooking.datasets.vocabulary"] = _inv.datasets.vocabulary
 
 
 # ── Step 1: Download ───────────────────────────────────────────
