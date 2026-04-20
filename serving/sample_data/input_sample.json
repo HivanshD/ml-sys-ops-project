@@ -1,25 +1,23 @@
 {
   "recipe_id": "1204837",
-  "recipe_title": "Classic Cheesecake",
+  "recipe_title": "Classic Beef Stroganoff",
   "ingredients": [
-    {"raw": "2 cups cream cheese", "normalized": "cream cheese"},
-    {"raw": "1 cup sour cream", "normalized": "sour cream"},
-    {"raw": "3/4 cup sugar", "normalized": "sugar"},
-    {"raw": "3 large eggs", "normalized": "egg"},
-    {"raw": "1 tsp vanilla extract", "normalized": "vanilla extract"},
-    {"raw": "1 1/2 cups graham cracker crumbs", "normalized": "graham cracker crumbs"},
-    {"raw": "1/4 cup melted butter", "normalized": "butter"}
+    {"raw": "1 lb beef sirloin, thinly sliced", "normalized": "beef sirloin"},
+    {"raw": "1 cup beef broth", "normalized": "beef broth"},
+    {"raw": "2 tbsp butter", "normalized": "butter"},
+    {"raw": "2 tbsp all-purpose flour", "normalized": "all-purpose flour"},
+    {"raw": "8 oz egg noodles", "normalized": "egg noodles"}
   ],
   "instructions": [
-    "Preheat oven to 325F.",
-    "Mix graham cracker crumbs with melted butter and press into pan.",
-    "Beat cream cheese and sugar until smooth.",
-    "Add eggs one at a time, then sour cream and vanilla.",
-    "Pour over crust and bake 55 minutes."
+    "Brown beef in butter over medium-high heat.",
+    "Saute onions until soft. Stir in flour.",
+    "Add broth and simmer 10 minutes.",
+    "Remove from heat. Fold in sour cream."
   ],
   "missing_ingredient": {
     "raw": "1 cup sour cream",
     "normalized": "sour cream"
   },
-  "top_k": 3
+  "request_id": "req_8a3f2c1d",
+  "timestamp": "2025-04-05T14:32:00Z"
 }
