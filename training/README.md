@@ -74,12 +74,4 @@ WRITES: models-proj01/production/subst_model_current.pth
 WRITES: MLflow model registry
 ```
 
-## Swap to Real Data
 
-When data team uploads Recipe1MSubs, just change the `--dataset` path:
-
-```bash
---dataset data-proj01/raw/recipe1msubs/train.json
-```
-
-Same model, same hyperparameters — no code changes needed.
