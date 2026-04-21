@@ -59,14 +59,14 @@ def main():
     # when staging/canary/production are all scraped by the same Prometheus
     latency_q = (
         'histogram_quantile(0.95, '
-        'rate(subst_request_latency_seconds_bucket'
-        '{namespace="' + NAMESPACE + '"}[10m]))'
+        'sum by (le) (rate(subst_request_latency_seconds_bucket'
+        '{namespace="' + NAMESPACE + '"}[10m])))'
     )
     error_q = (
-        'rate(subst_requests_total'
-        '{namespace="' + NAMESPACE + '",status="error"}[5m]) / '
-        'rate(subst_requests_total'
-        '{namespace="' + NAMESPACE + '"}[5m])'
+        'sum(rate(subst_requests_total'
+        '{namespace="' + NAMESPACE + '",status="error"}[5m])) / '
+        'sum(rate(subst_requests_total'
+        '{namespace="' + NAMESPACE + '"}[5m]))'
     )
 
     p95 = query_prom(latency_q)

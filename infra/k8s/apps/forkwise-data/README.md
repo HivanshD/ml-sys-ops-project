@@ -68,5 +68,5 @@ kubectl patch cronjob drift-monitor -n forkwise-data -p '{"spec":{"suspend":fals
 ## In-Cluster Contracts
 
 1. Feedback endpoint: `http://subst-feedback.forkwise-data.svc.cluster.local:8001/feedback`
-2. Serving endpoint consumed by generator: `http://substitution-serving.forkwise-serving.svc.cluster.local:8000/predict`
-
+2. Production serving endpoint consumed by generator: `http://subst-serving.production-proj01.svc.cluster.local:8000/predict`
+3. Canary serving endpoint consumed by generator for rollout validation: `http://subst-serving.canary-proj01.svc.cluster.local:8000/predict`

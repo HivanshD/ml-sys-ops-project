@@ -1,10 +1,16 @@
 # ForkWise Cloud Setup
 
-This is the canonical step-by-step runbook for bringing up the current
-ForkWise stack on a cloud Kubernetes environment, with the data-plane images
-pulled from GHCR instead of built ad hoc on the cluster.
+This is the canonical step-by-step runbook for bringing up ForkWise on a cloud
+Kubernetes environment, with the data-plane images pulled from GHCR instead of
+built ad hoc on the cluster.
 
-## What this deploys
+The current manifests can bootstrap the cluster and the base apps, and the repo
+now also includes an initial rollout implementation for the shared platform and
+`staging` / `canary` / `production` serving environments.
+
+For the rubric-to-repo mapping, read `infra/docs/DEVOPS_RUBRIC_MAP.md`.
+
+## What the current bootstrap path deploys
 
 1. Chameleon VMs via Terraform
 2. k3s via Ansible
@@ -16,6 +22,14 @@ pulled from GHCR instead of built ad hoc on the cluster.
   - `batch-pipeline`
   - `drift-monitor`
   - one-time `forkwise-ingest` bootstrap job
+
+## What still must be finished for full four-person system-implementation credit
+
+1. complete the remaining end-to-end validation across data, training, serving, and Mealie
+2. validate the live dashboards, CronJobs, and rollout rules on Chameleon under traffic
+3. verify the custom Mealie flow against the production rollout path
+4. decide whether the current synthetic canary traffic split is sufficient or whether to add ingress-based traffic splitting
+5. keep shared services unified rather than duplicated across roles
 
 ## Canonical GHCR images
 
@@ -37,6 +51,7 @@ You need:
 2. `terraform`, `ansible`, `kubectl`, and `docker` installed locally
 3. OpenStack object-store credentials for `data-proj01`
 4. A registry image for `substitution-serving`, or a local build/push plan for it
+5. A registry image for `infra/automation`, or a local build/push plan for it
 
 If the GHCR packages are private, log in before you do anything else:
 
@@ -61,6 +76,16 @@ terraform apply -auto-approve
 
 Record the floating IP for `node1`.
 
+After `post_k8s/post_k8s_configure.yml`, `kubectl` is prepared on `node1`, not
+on your Jupyter host by default. Unless you copy the kubeconfig locally, run
+cluster checks through SSH, for example:
+
+```bash
+ssh cc@<FLOATING_IP> 'kubectl get nodes'
+# or, if needed:
+ssh cc@<FLOATING_IP> 'sudo k3s kubectl get nodes'
+```
+
 ## 2. Bootstrap k3s
 
 ```bash
@@ -77,15 +102,25 @@ ansible-playbook -i inventory.yml k8s/install_k3s.yml
 ansible-playbook -i inventory.yml post_k8s/post_k8s_configure.yml
 ```
 
-## 3. Deploy Mealie and substitution-serving
+## 3. Build and push the rollout images
 
-Build and push the serving image from this repo, then deploy the base apps:
+Build and push the serving image and automation image from this repo:
 
 ```bash
 cd ../serving
 make build-onnx REGISTRY=ghcr.io/<your-org-or-user>
 make push-onnx REGISTRY=ghcr.io/<your-org-or-user>
 
+cd ../infra/automation
+docker build -t ghcr.io/<your-org-or-user>/forkwise-automation:$(git -C ../.. rev-parse --short HEAD) .
+docker push ghcr.io/<your-org-or-user>/forkwise-automation:$(git -C ../.. rev-parse --short HEAD)
+```
+
+## 4. Deploy Mealie and the bootstrap app path
+
+Deploy the base apps first:
+
+```bash
 cd ../infra/ansible
 ansible-playbook -i inventory.yml deploy/deploy_apps.yml \
   -e serving_image=ghcr.io/<your-org-or-user>/subst-serving-onnx:$(git -C ../.. rev-parse --short HEAD)
@@ -106,7 +141,41 @@ You should see:
 2. `substitution-serving` running in `forkwise-serving`
 3. NodePort `30090` for Mealie and `30080` for serving
 
-## 4. Create the ForkWise data secret
+## 5. Create the rollout secrets for serving
+
+The new `staging`, `canary`, `production`, and `monitoring` components expect
+an `os-credentials` secret with the exact keys below wherever serving or
+automation needs model-artifact access:
+
+```bash
+for ns in monitoring-proj01 staging-proj01 canary-proj01 production-proj01; do
+  kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
+  kubectl create secret generic os-credentials \
+    -n "$ns" \
+    --from-literal=OS_ENDPOINT=https://chi.tacc.chameleoncloud.org:7480 \
+    --from-literal=OS_ACCESS_KEY=<YOUR_OS_ACCESS_KEY> \
+    --from-literal=OS_SECRET_KEY=<YOUR_OS_SECRET_KEY> \
+    --dry-run=client -o yaml | kubectl apply -f -
+done
+```
+
+## 6. Deploy the platform and rollout environments
+
+```bash
+cd ../infra/ansible
+ansible-playbook -i inventory.yml deploy/deploy_rollout_stack.yml \
+  -e serving_image=ghcr.io/<your-org-or-user>/subst-serving-onnx:$(git -C ../.. rev-parse --short HEAD) \
+  -e automation_image=ghcr.io/<your-org-or-user>/forkwise-automation:$(git -C ../.. rev-parse --short HEAD)
+```
+
+That playbook now does three rollout-specific tasks for you:
+
+1. deploys Prometheus, Grafana, and the automation service
+2. bootstraps `models-proj01/manifests/{staging,canary,production}.json`
+   from either the latest candidate or the legacy production artifacts
+3. deploys and restarts the serving environments so they pick up the current manifests
+
+## 7. Create the ForkWise data secret
 
 The data workloads expect the `s3-credentials` secret in `forkwise-data`.
 
@@ -133,7 +202,7 @@ kubectl create secret docker-registry ghcr-pull \
 Then patch the default service account or add `imagePullSecrets` to the
 manifests before applying them.
 
-## 5. Apply the canonical ForkWise data manifests
+## 8. Apply the canonical ForkWise data manifests
 
 ```bash
 kubectl apply -k infra/k8s/apps/forkwise-data
@@ -154,7 +223,7 @@ kubectl get all -n forkwise-data
 kubectl get cronjobs -n forkwise-data
 ```
 
-## 6. Seed object storage once with the ingest job
+## 9. Seed object storage once with the ingest job
 
 The data stack is not ready until `data-proj01` has the validated raw splits and
 holdout set. Run the one-time ingest job:
@@ -172,7 +241,7 @@ Success means:
 3. `data/production_holdout/holdout.json` was written
 4. a QC1 report was written under `data/quality_reports/`
 
-## 7. Turn on the live workloads
+## 10. Turn on the live workloads
 
 Once ingest is complete and `substitution-serving` is healthy, enable the rest:
 
@@ -191,7 +260,11 @@ kubectl logs deployment/data-generator -n forkwise-data --tail=20
 kubectl get cronjobs -n forkwise-data
 ```
 
-## 8. Smoke-test the stack
+The data generator now supports a synthetic canary split using
+`CANARY_SERVING_URL` and `CANARY_TRAFFIC_PERCENT`, so the default config can
+exercise both production and canary serving during rollout validation.
+
+## 11. Smoke-test the stack
 
 Tunnel to the NodePorts from your laptop:
 
@@ -211,7 +284,7 @@ curl -X POST http://localhost:8001/feedback \
   -d '{"request_id":"demo-1","recipe_id":"123","missing_ingredient":"sour cream","suggested_substitution":"greek yogurt","user_accepted":true}'
 ```
 
-## 9. Teammate self-demo with Docker
+## 12. Teammate self-demo with Docker
 
 If a teammate only wants to verify the published images, they can run them
 outside Kubernetes.
@@ -293,7 +366,7 @@ docker run --rm \
   ghcr.io/itsnotaka/forkwise-generator:demo
 ```
 
-## 10. What to do if something fails
+## 13. What to do if something fails
 
 1. `forkwise-ingest` fails:
   check the job logs first; object-store credentials or outbound internet access
@@ -304,6 +377,14 @@ docker run --rm \
   confirm ingest already wrote the holdout file and the serving URL is reachable.
 4. CronJobs stay suspended:
   this is intentional until you explicitly unsuspend them.
+5. `substitution-serving`, `mealie`, or `mealie-postgres` stay `Pending` after deploy:
+  check the pod events for `node affinity/selector` failures. The deploy path now pins these workloads to the control/entrypoint node with the `forkwise.io/entrypoint=true` label instead of assuming the hostname is literally `node1`. If you created the cluster before this label task existed, run:
+
+```bash
+ssh cc@<FLOATING_IP> 'kubectl label node "$(hostname)" forkwise.io/entrypoint=true --overwrite'
+```
+
+  then restart the affected deployments.
 
 This file is the canonical cloud bring-up doc for the unreleased GHCR-based
 ForkWise deployment.
