@@ -98,7 +98,7 @@ def download_direct(s3, bucket, backend, metadata_path):
     if backend == 'pytorch':
         ok = download(
             s3, bucket,
-            os.getenv('MODEL_KEY', 'production/subst_model_current.pth'),
+            os.getenv('MODEL_KEY', 'models/production/subst_model_current.pth'),
             os.getenv('MODEL_PATH', '/app/model.pth'),
             'PyTorch checkpoint')
         if ok:
@@ -108,14 +108,19 @@ def download_direct(s3, bucket, backend, metadata_path):
     if backend == 'onnx':
         ok_model = download(
             s3, bucket,
-            os.getenv('ONNX_MODEL_KEY', 'production/subst_model_current.onnx'),
+            os.getenv('ONNX_MODEL_KEY', 'models/production/subst_model_current.onnx'),
             os.getenv('ONNX_MODEL_PATH', '/app/model.onnx'),
             'ONNX model')
         ok_vocab = download(
             s3, bucket,
-            os.getenv('VOCAB_KEY', 'production/vocab.json'),
+            os.getenv('VOCAB_KEY', 'models/production/vocab.json'),
             os.getenv('VOCAB_PATH', '/app/vocab.json'),
             'Vocabulary')
+        download(
+            s3, bucket,
+            os.getenv('MODEL_METADATA_KEY', 'models/production/model_metadata.json'),
+            os.getenv('MODEL_METADATA_PATH', '/app/model_metadata.json'),
+            'Model metadata')
         if ok_model and ok_vocab:
             write_metadata(metadata_path, metadata)
             return True

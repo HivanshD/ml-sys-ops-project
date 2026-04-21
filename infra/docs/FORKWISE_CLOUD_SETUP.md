@@ -17,11 +17,12 @@ For the rubric-to-repo mapping, read `infra/docs/DEVOPS_RUBRIC_MAP.md`.
 3. `Mealie` in `forkwise-app`
 4. `substitution-serving` in `forkwise-serving`
 5. `forkwise-data` workloads in `forkwise-data`
-  - `subst-feedback`
-  - `data-generator`
-  - `batch-pipeline`
-  - `drift-monitor`
-  - one-time `forkwise-ingest` bootstrap job
+   - `subst-feedback`
+   - `data-generator`
+   - `batch-pipeline`
+   - `drift-monitor`
+   - `training-trigger`
+   - one-time `forkwise-ingest` bootstrap job
 
 ## What still must be finished for full four-person system-implementation credit
 
@@ -51,7 +52,8 @@ You need:
 2. `terraform`, `ansible`, `kubectl`, and `docker` installed locally
 3. OpenStack object-store credentials for `data-proj01`
 4. A registry image for `substitution-serving`, or a local build/push plan for it
-5. A registry image for `infra/automation`, or a local build/push plan for it
+5. A registry image for `forkwise-train`, or a local build/push plan for it
+6. A registry image for `infra/automation` (rollout path), or a local build/push plan for it
 
 If the GHCR packages are private, log in before you do anything else:
 
@@ -102,14 +104,19 @@ ansible-playbook -i inventory.yml k8s/install_k3s.yml
 ansible-playbook -i inventory.yml post_k8s/post_k8s_configure.yml
 ```
 
-## 3. Build and push the rollout images
+## 3. Build and push images
 
-Build and push the serving image and automation image from this repo:
+Build and push the serving, training, and automation images from this repo:
 
 ```bash
 cd ../serving
 make build-onnx REGISTRY=ghcr.io/<your-org-or-user>
 make push-onnx REGISTRY=ghcr.io/<your-org-or-user>
+
+cd ../training
+docker build -t ghcr.io/<your-org-or-user>/forkwise-train:$(git -C .. rev-parse --short HEAD) \
+  -f docker_nvidia/Dockerfile ..
+docker push ghcr.io/<your-org-or-user>/forkwise-train:$(git -C .. rev-parse --short HEAD)
 
 cd ../infra/automation
 docker build -t ghcr.io/<your-org-or-user>/forkwise-automation:$(git -C ../.. rev-parse --short HEAD) .
@@ -117,8 +124,6 @@ docker push ghcr.io/<your-org-or-user>/forkwise-automation:$(git -C ../.. rev-pa
 ```
 
 ## 4. Deploy Mealie and the bootstrap app path
-
-Deploy the base apps first:
 
 ```bash
 cd ../infra/ansible
@@ -133,13 +138,15 @@ kubectl get pods -n forkwise-app
 kubectl get pods -n forkwise-serving
 kubectl get svc -n forkwise-app
 kubectl get svc -n forkwise-serving
+kubectl get cronjob -n forkwise-serving
 ```
 
 You should see:
 
 1. `mealie` running in `forkwise-app`
 2. `substitution-serving` running in `forkwise-serving`
-3. NodePort `30090` for Mealie and `30080` for serving
+3. `check-rollback` present in `forkwise-serving`
+4. NodePort `30090` for Mealie and `30080` for serving
 
 ## 5. Create the rollout secrets for serving
 
@@ -175,15 +182,24 @@ That playbook now does three rollout-specific tasks for you:
    from either the latest candidate or the legacy production artifacts
 3. deploys and restarts the serving environments so they pick up the current manifests
 
-## 7. Create the ForkWise data secret
+## 7. Create the object-store secrets
 
 The data workloads expect the `s3-credentials` secret in `forkwise-data`.
+The serving deployment also expects the same secret in `forkwise-serving`
+because it loads model artifacts and writes request logs directly to object
+storage.
 
 ```bash
 kubectl create namespace forkwise-data --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace forkwise-serving --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl create secret generic s3-credentials \
   -n forkwise-data \
+  --from-literal=access-key=<YOUR_OS_ACCESS_KEY> \
+  --from-literal=secret-key=<YOUR_OS_SECRET_KEY>
+
+kubectl create secret generic s3-credentials \
+  -n forkwise-serving \
   --from-literal=access-key=<YOUR_OS_ACCESS_KEY> \
   --from-literal=secret-key=<YOUR_OS_SECRET_KEY>
 ```
@@ -206,6 +222,10 @@ manifests before applying them.
 
 ```bash
 kubectl apply -k infra/k8s/apps/forkwise-data
+
+kubectl set image cronjob/training-trigger \
+  training=ghcr.io/<your-org-or-user>/forkwise-train:$(git rev-parse --short HEAD) \
+  -n forkwise-data
 ```
 
 This creates:
@@ -215,12 +235,14 @@ This creates:
 3. the `subst-feedback` deployment and service
 4. the `data-generator` deployment at `replicas=0`
 5. the `batch-pipeline` and `drift-monitor` cronjobs in a suspended state
+6. the `training-trigger` cronjob in an active state
 
 Verify:
 
 ```bash
 kubectl get all -n forkwise-data
 kubectl get cronjobs -n forkwise-data
+kubectl get cronjob training-trigger -n forkwise-data
 ```
 
 ## 9. Seed object storage once with the ingest job
@@ -258,6 +280,7 @@ kubectl rollout status deployment/subst-feedback -n forkwise-data
 kubectl rollout status deployment/data-generator -n forkwise-data
 kubectl logs deployment/data-generator -n forkwise-data --tail=20
 kubectl get cronjobs -n forkwise-data
+kubectl get cronjob training-trigger -n forkwise-data
 ```
 
 The data generator now supports a synthetic canary split using
@@ -369,22 +392,32 @@ docker run --rm \
 ## 13. What to do if something fails
 
 1. `forkwise-ingest` fails:
-  check the job logs first; object-store credentials or outbound internet access
+   check the job logs first; object-store credentials or outbound internet access
    are usually the issue.
 2. `subst-feedback` fails:
-  confirm `s3-credentials` exists in `forkwise-data`.
-3. `data-generator` fails:
-  confirm ingest already wrote the holdout file and the serving URL is reachable.
-4. CronJobs stay suspended:
-  this is intentional until you explicitly unsuspend them.
-5. `substitution-serving`, `mealie`, or `mealie-postgres` stay `Pending` after deploy:
-  check the pod events for `node affinity/selector` failures. The deploy path now pins these workloads to the control/entrypoint node with the `forkwise.io/entrypoint=true` label instead of assuming the hostname is literally `node1`. If you created the cluster before this label task existed, run:
+   confirm `s3-credentials` exists in `forkwise-data`.
+3. `substitution-serving` falls back to the stub model:
+   confirm `s3-credentials` exists in `forkwise-serving` and that the
+   `models/production/` artifacts are present in object storage.
+4. `check-rollback` fails:
+   confirm the CronJob image was patched to the same serving image and that
+   previous model artifacts exist under `models/production/`.
+5. `data-generator` fails:
+   confirm ingest already wrote the holdout file and the serving URL is reachable.
+6. CronJobs stay suspended:
+   this is intentional for `batch-pipeline` and `drift-monitor` until you
+   explicitly unsuspend them.
+7. `substitution-serving`, `mealie`, or `mealie-postgres` stay `Pending` after deploy:
+   check the pod events for `node affinity/selector` failures. The deploy path pins these workloads to the control/entrypoint node with the `forkwise.io/entrypoint=true` label instead of assuming the hostname is literally `node1`. If you created the cluster before this label task existed, run:
 
 ```bash
 ssh cc@<FLOATING_IP> 'kubectl label node "$(hostname)" forkwise.io/entrypoint=true --overwrite'
 ```
 
-  then restart the affected deployments.
+   then restart the affected deployments.
 
 This file is the canonical cloud bring-up doc for the unreleased GHCR-based
 ForkWise deployment.
+
+For a concise end-to-end verification of the internal data -> training ->
+serving loop, use [INTERNAL_LOOP_SMOKE.md](./INTERNAL_LOOP_SMOKE.md).

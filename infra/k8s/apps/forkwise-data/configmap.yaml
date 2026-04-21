@@ -6,6 +6,8 @@ metadata:
 data:
   OS_ENDPOINT: https://chi.tacc.chameleoncloud.org:7480
   BUCKET: data-proj01
+  MODEL_PREFIX: models
+  VAL_DATASET_KEY: data/raw/recipe1msubs/val.json
   SERVING_URL: http://subst-serving.production-proj01.svc.cluster.local:8000/predict
   CANARY_SERVING_URL: http://subst-serving.canary-proj01.svc.cluster.local:8000/predict
   CANARY_TRAFFIC_PERCENT: "0.10"
