@@ -22,6 +22,7 @@ ansible/
 3. `k8s/install_k3s.yml` installs k3s with `node1` as the server and `node2`/`node3` as agents.
 4. `post_k8s/post_k8s_configure.yml` prepares kubectl access and installs Helm and metrics-server.
 5. `deploy/deploy_apps.yml` copies this repo's `k8s/` directory to `node1`, creates the required Mealie secret, and applies the base app manifests for Mealie and substitution-serving.
+6. `deploy/deploy_rollout_stack.yml` applies the shared platform services, bootstraps the rollout model manifests in object storage through the automation service, then deploys the `staging`, `canary`, and `production` serving environments.
 
 ## Minimal Sequence
 
@@ -34,6 +35,7 @@ ansible-playbook -i inventory.yml pre_k8s/pre_k8s_configure.yml
 ansible-playbook -i inventory.yml k8s/install_k3s.yml
 ansible-playbook -i inventory.yml post_k8s/post_k8s_configure.yml
 ansible-playbook -i inventory.yml deploy/deploy_apps.yml -e serving_image=<registry>/substitution-serving:<tag>
+ansible-playbook -i inventory.yml deploy/deploy_rollout_stack.yml -e serving_image=<registry>/subst-serving-onnx:<tag> -e automation_image=<registry>/forkwise-automation:<tag>
 ```
 
 For the full ForkWise cloud bring-up, continue with
@@ -43,5 +45,7 @@ the GHCR-backed `forkwise-data` workloads and the one-time ingest bootstrap job.
 ## Notes
 
 1. `ansible.cfg` is ignored by Git because it contains live connection details.
-2. This path intentionally avoids Argo and multi-environment rollout complexity.
-3. Services are exposed as NodePorts on `node1` so you can reach them with SSH tunneling without opening additional public ports.
+2. `deploy/deploy_apps.yml` deploys the bootstrap app manifests only. The rollout and monitoring layers are applied separately by `deploy/deploy_rollout_stack.yml`.
+3. `deploy/deploy_rollout_stack.yml` expects `os-credentials` to exist in `monitoring-proj01` before it runs, because the automation service uses object storage to seed and manage rollout manifests.
+4. Services are exposed as NodePorts on `node1` so you can reach them with SSH tunneling without opening additional public ports.
+5. `kubectl` is prepared on `node1` by `post_k8s/post_k8s_configure.yml`; use `ssh cc@<FLOATING_IP> 'kubectl ...'` for remote checks unless you copy kubeconfig locally.

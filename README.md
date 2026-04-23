@@ -26,16 +26,30 @@ on Recipe1MSubs.
 - Infra migration notes: `infra/docs/`
 - Historical serving integration notes: `serving/INTEGRATION.md`
 
-## Canonical cloud path
+## Deployment Status
 
-The current canonical deployment uses app-oriented namespaces and GHCR-backed
-ForkWise data images:
+The repo currently includes a working bootstrap path on Chameleon using the
+app-oriented namespaces below:
 
 - `forkwise-app` for Mealie
 - `forkwise-serving` for the primary serving API
 - `forkwise-data` for feedback, ingest, generator, batch, and drift workloads
 
-Use `infra/docs/FORKWISE_CLOUD_SETUP.md` for the step-by-step cloud bring-up.
+That bootstrap path is useful for cluster bring-up, and the repo now also
+includes an initial rollout implementation under `infra/k8s/platform/`,
+`infra/k8s/staging/`, `infra/k8s/canary/`, and `infra/k8s/production/`.
+
+The remaining work for full rubric credit is narrower now:
+
+- validate the rollout loop live on Chameleon under traffic
+- verify the custom Mealie flow against the production rollout path
+- decide whether the current synthetic canary split is sufficient or whether to add ingress-based traffic splitting
+- keep one unified set of buckets, registries, and monitoring services rather than duplicated role-owned stacks
+
+Use these docs as the canonical entry points:
+
+- `infra/docs/FORKWISE_CLOUD_SETUP.md` for cloud bootstrap and target-state notes
+- `infra/docs/DEVOPS_RUBRIC_MAP.md` for the DevOps rubric-to-repo mapping
 
 ## Published ForkWise data images
 
