@@ -62,9 +62,5 @@ resource "openstack_compute_instance_v2" "nodes" {
 resource "openstack_networking_floatingip_v2" "floating_ip" {
   pool        = var.floating_ip_pool
   description = "ForkWise floating IP for ${var.suffix}"
-}
-
-resource "openstack_compute_floatingip_associate_v2" "fip_assoc" {
-  floating_ip = openstack_networking_floatingip_v2.floating_ip.address
-  instance_id = openstack_compute_instance_v2.nodes["node1"].id
+  port_id     = openstack_networking_port_v2.project_ports["node1"].id
 }
