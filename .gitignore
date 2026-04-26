@@ -49,4 +49,7 @@ benchmark_results_*.json
 perf_analyzer_*.csv
 
 # Docker build artifacts
-*.tar
+*.tardata/processed/
+training/__pycache__/
+**/__pycache__/
+**/*.pyc
