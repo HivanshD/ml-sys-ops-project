@@ -13,8 +13,8 @@ clouds:
       
       auth_url: https://kvm.tacc.chameleoncloud.org:5000
       
-      application_credential_id: "961360762f1a459cb8b0373b1325353f"
-      application_credential_secret: "F883SUcgSuc-jni9-KHOCPwLk6X2YQNm6j7c4CI7ahtWH3rai47yJugnaLZTPe2MJjVj0gZgJi5UWROCYdCfww"
+      application_credential_id: "b9ff89b54f2349848b84c48d46d6954a"
+      application_credential_secret: "z2HN1PgjHv7kAxhN2R1c37vfXXaqMzbcbu9CUJfDqI12jMaKCw6KY2jux4SWDev_GprswLkR9Rm8MiNmPoKHRg"
     
       
         
